@@ -1,0 +1,162 @@
+import java.sql.*;
+import java.util.Scanner;
+
+public class VotingSystem {
+    // Database credentials
+    private static final String URL = "jdbc:mysql://localhost:3306/voting_system";
+    private static final String USER = "kirthika";
+    private static final String PASSWORD = "1234"; // Change this to your MySQL password
+
+    // JDBC objects
+    private static Connection conn;
+    private static Statement stmt;
+    private static ResultSet rs;
+
+    // Scanner for user input
+    private static Scanner scanner = new Scanner(System.in);
+
+    public static void main(String[] args) {
+        try {
+            // Connect to the database
+            conn = DriverManager.getConnection(URL, USER, PASSWORD);
+            stmt = conn.createStatement();
+
+            System.out.println("Welcome to the Voting System");
+            System.out.println("1. Register\n2. Login\n3. View Database\nChoose an option: ");
+            int choice = scanner.nextInt();
+            scanner.nextLine(); // Consume newline
+
+            if (choice == 1) {
+                registerUser();
+                main(null); // Restart flow for login
+            } else if (choice == 2) {
+                if (loginUser()) {
+                    votingFlow();
+                } else {
+                    System.out.println("Login failed. Exiting.");
+                }
+            } else if (choice == 3) {
+                viewDatabase();
+            } else {
+                System.out.println("Invalid option. Exiting.");
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            // Close resources
+            try {
+                if (rs != null) rs.close();
+                if (stmt != null) stmt.close();
+                if (conn != null) conn.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    // Register a new user
+    private static void registerUser() throws SQLException {
+        System.out.print("Enter a username: ");
+        String username = scanner.nextLine();
+        System.out.print("Enter a password: ");
+        String password = scanner.nextLine();
+
+        String query = "INSERT INTO users (username, password) VALUES (?, ?)";
+        PreparedStatement pstmt = conn.prepareStatement(query);
+        pstmt.setString(1, username);
+        pstmt.setString(2, password);
+
+        int rowsInserted = pstmt.executeUpdate();
+
+        if (rowsInserted > 0) {
+            System.out.println("Registration successful. You can now log in.");
+        } else {
+            System.out.println("Registration failed. Please try again.");
+        }
+    }
+
+    // Log in a user
+    private static boolean loginUser() throws SQLException {
+        System.out.print("Enter your username: ");
+        String username = scanner.nextLine();
+        System.out.print("Enter your password: ");
+        String password = scanner.nextLine();
+
+        String query = "SELECT * FROM users WHERE username = ? AND password = ?";
+        PreparedStatement pstmt = conn.prepareStatement(query);
+        pstmt.setString(1, username);
+        pstmt.setString(2, password);
+
+        rs = pstmt.executeQuery();
+
+        if (rs.next()) {
+            System.out.println("Login successful. Welcome, " + username + "!");
+            return true;
+        } else {
+            System.out.println("Invalid username or password.");
+            return false;
+        }
+    }
+
+    // Voting process
+    private static void votingFlow() throws SQLException {
+        displayCandidates();
+
+        // Get user's vote
+        System.out.print("Enter the candidate ID to vote for: ");
+        int candidateId = scanner.nextInt();
+
+        // Record the vote
+        voteForCandidate(candidateId);
+
+        // Show updated results
+        displayCandidates();
+    }
+
+    // Display the list of candidates
+    private static void displayCandidates() throws SQLException {
+        System.out.println("\nAvailable Candidates:");
+        String query = "SELECT * FROM candidates";
+        rs = stmt.executeQuery(query);
+
+        while (rs.next()) {
+            int id = rs.getInt("id");
+            String name = rs.getString("name");
+            int votes = rs.getInt("votes");
+            System.out.println(id + ". " + name + " - Votes: " + votes);
+        }
+    }
+
+    // Cast a vote for a candidate
+    private static void voteForCandidate(int candidateId) throws SQLException {
+        String query = "UPDATE candidates SET votes = votes + 1 WHERE id = ?";
+        PreparedStatement pstmt = conn.prepareStatement(query);
+        pstmt.setInt(1, candidateId);
+
+        int rowsAffected = pstmt.executeUpdate();
+
+        if (rowsAffected > 0) {
+            System.out.println("Vote successfully cast for Candidate " + candidateId);
+        } else {
+            System.out.println("Invalid candidate ID. Please try again.");
+        }
+    }
+
+    // View the database
+    private static void viewDatabase() throws SQLException {
+        System.out.println("Users Table:");
+        String userQuery = "SELECT * FROM users";
+        rs = stmt.executeQuery(userQuery);
+        while (rs.next()) {
+            System.out.println("ID: " + rs.getInt("id") + ", Username: " + rs.getString("username"));
+        }
+
+        System.out.println("\nCandidates Table:");
+        String candidateQuery = "SELECT * FROM candidates";
+        rs = stmt.executeQuery(candidateQuery);
+        while (rs.next()) {
+            System.out.println("ID: " + rs.getInt("id") + ", Name: " + rs.getString("name") + ", Votes: " + rs.getInt("votes"));
+        }
+    }
+}
